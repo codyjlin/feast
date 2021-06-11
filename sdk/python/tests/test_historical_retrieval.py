@@ -315,7 +315,7 @@ def test_historical_features_from_parquet_sources(infer_event_timestamp_col):
         )
 
 
-@pytest.mark.integration
+# @pytest.mark.integration
 @pytest.mark.parametrize(
     "provider_type", ["local", "gcp", "gcp_custom_offline_config"],
 )
@@ -450,6 +450,26 @@ def test_historical_features_from_bigquery_sources(
                     f"\nTime to execute job_from_df.to_df() = '{(end_time - start_time)}'"
                 )
             )
+
+        # Saves result directly to bigquery
+        expire_in_days = 3
+        start_time = datetime.utcnow()
+        job_from_sql.to_bq(
+            dataset=bigquery_dataset, table="test_table", expire_in_days=expire_in_days
+        )
+        end_time = datetime.utcnow()
+        with capsys.disabled():
+            print(
+                str(
+                    f"\nTime to execute job_from_df.to_bq() = '{(end_time - start_time)}'"
+                )
+            )
+        # Asserts that the table was created
+        client = bigquery.Client()
+        table = client.get_table(f"{gcp_project}.{bigquery_dataset}.test_table")
+        assert table.expires <= (
+            datetime.utcnow() + timedelta(days=expire_in_days)
+        ).astimezone(utc)
 
         assert sorted(expected_df.columns) == sorted(
             actual_df_from_sql_entities.columns
